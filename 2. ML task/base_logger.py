@@ -1,4 +1,3 @@
-import logging
+from src.log import logger
 
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+__all__ = ["logger"]

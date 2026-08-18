@@ -1,24 +1,17 @@
-FROM python:3.9
+FROM python:3.11-slim
 
-WORKDIR /
+WORKDIR /app
 
-COPY requirements.txt requirements.txt
-
+COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# create directories
-RUN mkdir /python/
-RUN mkdir /python/artifacts
-
-# copy directories
-COPY artifacts /python/artifacts
-
-# copy files
-COPY base_logger.py /python/base_logger.py
-COPY app.py /python/app.py
-
-WORKDIR /python/
+COPY src ./src
+COPY app.py base_logger.py ./
+COPY artifacts/model.joblib artifacts/metrics.json artifacts/training_config.json ./artifacts/
 
 EXPOSE 8000
 
-ENTRYPOINT ["uvicorn", "--host",  "0.0.0.0", "--port",  "8000", "app:app"]
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+    CMD python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health')"
+
+ENTRYPOINT ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8000"]

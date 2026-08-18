@@ -1,9 +1,11 @@
 # Python
 __pycache__/
 *.pyc
+.pytest_cache/
+.ipynb_checkpoints/
 .idea/
 .DS_Store
-../.DS_Store
 
 # Virtual environments
 venv/
+.venv/

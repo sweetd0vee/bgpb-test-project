@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
+set -euo pipefail
 
-IMAGE=arina/bgps
-TAG=master
+IMAGE="${IMAGE:-bgpb-ml}"
+TAG="${TAG:-latest}"
 
-cd ..
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+cd "$ROOT"
 
-docker build -t $IMAGE:$TAG .
-
+docker build -t "${IMAGE}:${TAG}" .

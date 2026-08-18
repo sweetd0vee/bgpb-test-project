@@ -1,6 +1,7 @@
-#!/bin/bash
+#!/usr/bin/env bash
+set -euo pipefail
 
+ROOT="$(cd "$(dirname "$0")" && pwd)"
+export COMPOSE_PROJECT_NAME="${COMPOSE_PROJECT_NAME:-bgpb-ml}"
 
-export COMPOSE_PROJECT_NAME=bgps
-
-docker-compose -f docker-compose.yml up -d
+docker compose -f "$ROOT/docker-compose.yml" up -d --build

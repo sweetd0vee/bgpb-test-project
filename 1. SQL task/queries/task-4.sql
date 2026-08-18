@@ -1,18 +1,18 @@
+-- Task 4.
+-- Latest YL clients whose name starts with "ООО" (case-insensitive)
+-- and who opened more than one contract in 2022.
+
 select
-    name_client
-from
-    (
-        select
-            name_client,
-            count(l.id_loan) as num_loans
-        from
-            clients c
-        join
-            loans l ON c.id_client = l.id_client
-        where
-            type_client = 'ЮЛ' and name_client ilike 'ООО%' -- Фильтрация по типу и наименованию клиента
-            and dt_open_loan between '2022-01-01' and '2022-12-31' -- Фильтрация по дате договора
-        group by
-            c.name_client
-        having count (distinct l.id_loan) > 1 -- Фильтрация по количеству договоров
-    ) as filtered_clients;
+    c.name_client
+from clients as c
+join loans as l
+    on l.id_client = c.id_client
+   and l.dt_end = date '3001-01-01'
+where c.dt_end = date '3001-01-01'
+  and c.type_client = 'ЮЛ'
+  and c.name_client ilike 'ООО%'
+  and l.dt_open_loan >= date '2022-01-01'
+  and l.dt_open_loan < date '2023-01-01'
+group by c.id_client, c.name_client
+having count(distinct l.id_loan) > 1
+order by c.name_client;

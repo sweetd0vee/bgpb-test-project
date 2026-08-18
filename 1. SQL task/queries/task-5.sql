@@ -1,38 +1,57 @@
-with 
-loans_rest_rs as (
-	select	
-		c.name_client,
-		l2.num_loan, 
-		lf.rest_od_eq + lf.rest_pd_eq as rest_eq_deal
-	from loans l2
-	join loans_fact lf on lf.id_loan = l2.id_loan 
-	join clients c  on l2.id_client = c.id_client 
-	where
-		l2.id_client in (
-			-- все client_id которые нам нужны
-			select c.id_client
-			from clients c
-			join loans l on c.id_client = l.id_client
-			where
-				-- Фильтрация по типу клиента
-		 		type_client = 'ЮЛ'
-				-- Фильтрация по дате договора
-				and dt_open_loan between '2023-09-01' and '2023-09-30'
-			group by c.id_client
-			having
-				-- Фильтрация по количеству договоров
-		 		count (distinct l.id_loan) > 1 
-	 	) 
-		and lf.dt = '2023-09-30' 
-		and l2.dt_open_loan between '2023-09-01' and '2023-09-30'
-	order by c.name_client
-),
-client_total as (
-	select loans_rest_rs.name_client, sum(loans_rest_rs.rest_eq_deal) as rest_eq_client from loans_rest_rs
-	group by loans_rest_rs.name_client
-)
+-- Task 5.
+-- Latest YL clients who opened more than one contract in September 2023.
+-- Show those September contracts with equivalent outstanding on 2023-09-30
+-- (zeros kept). Expected: name_client, num_loan, rest_eq_deal, rest_eq_client.
 
-select rs.name_client, rs.num_loan, rs.rest_eq_deal, t.rest_eq_client
-from loans_rest_rs rs
-left join client_total t on rs.name_client = t.name_client
-order by rs.name_client
+with report as (
+    select date '2023-09-30' as dt
+),
+latest_clients as (
+    select
+        c.id_client,
+        c.name_client
+    from clients as c
+    where c.dt_end = date '3001-01-01'
+      and c.type_client = 'ЮЛ'
+),
+latest_loans as (
+    select
+        l.id_loan,
+        l.id_client,
+        l.num_loan,
+        l.dt_open_loan
+    from loans as l
+    where l.dt_end = date '3001-01-01'
+      and l.dt_open_loan >= date '2023-09-01'
+      and l.dt_open_loan < date '2023-10-01'
+),
+eligible_clients as (
+    select
+        c.id_client,
+        c.name_client
+    from latest_clients as c
+    join latest_loans as l
+        on l.id_client = c.id_client
+    group by c.id_client, c.name_client
+    having count(distinct l.id_loan) > 1
+),
+fact_as_of as (
+    select distinct on (lf.id_loan)
+        lf.id_loan,
+        coalesce(lf.rest_od_eq, 0) + coalesce(lf.rest_pd_eq, 0) as rest_eq
+    from loans_fact as lf
+    cross join report as r
+    where lf.dt <= r.dt
+    order by lf.id_loan, lf.dt desc
+)
+select
+    e.name_client,
+    l.num_loan,
+    coalesce(f.rest_eq, 0) as rest_eq_deal,
+    sum(coalesce(f.rest_eq, 0)) over (partition by e.id_client) as rest_eq_client
+from eligible_clients as e
+join latest_loans as l
+    on l.id_client = e.id_client
+left join fact_as_of as f
+    on f.id_loan = l.id_loan
+order by e.name_client, l.num_loan;

@@ -1,80 +1,92 @@
-import io
-from typing import Annotated
+"""FastAPI service that scores credit applications from a CSV upload."""
 
-import joblib
-import numpy as np
+from __future__ import annotations
+
+import io
+from contextlib import asynccontextmanager
+from typing import Any
+
 import pandas as pd
 from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 
-from artifacts.features import CATEGORICAL, FEATURES
-from base_logger import logger
+from src.data import DataValidationError, prepare_features
+from src.log import logger
+from src.model_io import ModelNotFoundError, load_pipeline
+from src.paths import MODEL_PATH
+from src.predict import predict_frame
+
+CONTENT_TYPE_CSV = {"text/csv", "application/vnd.ms-excel", "application/octet-stream", ""}
 
 
-# Load the pre-trained XGBoost model
-try:
-    model = joblib.load('artifacts/XGBoost.joblib')
-except FileNotFoundError:
-    logger.error("Model file not found")
-    raise HTTPException(500, "Model not available")
-
-try:
-    categorical_le = joblib.load('artifacts/label_encoders.joblib')
-except FileNotFoundError:
-    logger.error("Categorical encoders not found")
-    raise HTTPException(500, "Model not available")
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    try:
+        app.state.pipeline = load_pipeline(MODEL_PATH)
+        logger.info("Loaded pipeline from %s", MODEL_PATH)
+    except ModelNotFoundError:
+        app.state.pipeline = None
+        logger.warning("Model artifact is missing; /predict will return 503")
+    yield
 
 
-app = FastAPI()
-
-# CORS middleware allowing all origins and methods
-origins = ["*"]
-
+app = FastAPI(
+    title="Credit default model API",
+    description="Upload a CSV of applications and receive default-risk scores.",
+    lifespan=lifespan,
+)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,
-    allow_credentials=True,
-    allow_methods=["*"],
+    allow_origins=["*"],
+    allow_credentials=False,
+    allow_methods=["POST", "GET"],
     allow_headers=["*"],
 )
 
 
+def _read_csv(upload: UploadFile, raw: bytes) -> pd.DataFrame:
+    filename = (upload.filename or "").lower()
+    content_type = (upload.content_type or "").split(";")[0].strip().lower()
+    if filename and not filename.endswith(".csv") and content_type not in CONTENT_TYPE_CSV:
+        raise HTTPException(status_code=400, detail="File must be a CSV")
+    if not raw:
+        raise HTTPException(status_code=400, detail="Uploaded file is empty")
+    try:
+        text = raw.decode("utf-8")
+    except UnicodeDecodeError as exc:
+        raise HTTPException(status_code=400, detail="CSV must be UTF-8 encoded") from exc
+    try:
+        frame = pd.read_csv(io.StringIO(text))
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail="Could not parse CSV") from exc
+    if frame.empty:
+        raise HTTPException(status_code=400, detail="CSV has no data rows")
+    return frame
+
+
 @app.post("/predict")
-async def predict(file: UploadFile = File(...)):
-    logger.info("call predict")
+async def predict(file: UploadFile = File(...)) -> dict[str, Any]:
+    if getattr(app.state, "pipeline", None) is None:
+        raise HTTPException(status_code=503, detail="Model is not available")
 
-    # Validation of file type
-    if not file.filename.endswith('.csv'):
-        raise HTTPException(400, "File must be CSV")
+    logger.info("predict request filename=%s", file.filename)
+    raw = await file.read()
+    frame = _read_csv(file, raw)
+    try:
+        features = prepare_features(frame)
+    except DataValidationError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
-    contents = await file.read()
-    csvdata = pd.read_csv(io.StringIO(contents.decode('utf-8')))
-    data_test = pd.DataFrame(csvdata)
-
-    logger.info(data_test)
-
-    # Validation of columns in input file
-    required_cols = ['ID'] + FEATURES
-    if not all(c in data_test.columns for c in required_cols):
-        raise HTTPException(400, f"Missing required columns")
-
-    data_test = data_test.set_index('ID')
-
-    # Encoded categorical features in PredictionInput
-    logger.info(categorical_le)
-    data_test[CATEGORICAL] = categorical_le.transform(data_test[CATEGORICAL].astype('str'))
-    logger.info(data_test)
-    # Convert input features to a NumPy array
-
-    input_array = np.array(data_test[FEATURES]).reshape(1, -1)
-
-    # Make prediction
-    prediction = model.predict(input_array).tolist()
-    prediction_proba = model.predict_proba(input_array).tolist()
-    return {"prediction": prediction[0], "prediction_probability": prediction_proba[0]}
+    predictions = predict_frame(app.state.pipeline, features)
+    return {"n_rows": len(predictions), "predictions": predictions}
 
 
-# Health check endpoint
+@app.get("/health")
 @app.get("/")
-async def root():
-    return {"message": "XGBoost Model API is running!"}
+async def health() -> dict[str, Any]:
+    ready = getattr(app.state, "pipeline", None) is not None
+    return {
+        "message": "XGBoost Model API is running",
+        "model_loaded": ready,
+        "status": "ok" if ready else "model_missing",
+    }

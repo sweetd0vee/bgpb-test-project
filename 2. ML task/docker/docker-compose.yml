@@ -1,20 +1,22 @@
-version: '3'
-
-networks:
-  consul-network:
-    driver: bridge
-    external: false
-
 services:
-
-  bgps:
-    image: arina/bgps:master
-    container_name: bgps
-    hostname: bgps
+  ml-api:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    image: bgpb-ml:latest
+    container_name: bgpb-ml
     ports:
-      - 8000:8000
-    networks:
-      - consul-network
+      - "8000:8000"
     restart: unless-stopped
     healthcheck:
-      test: [ "CMD", "curl", "-f", "http://localhost:8000/" ]
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health')",
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
