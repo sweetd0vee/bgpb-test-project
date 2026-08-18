@@ -132,9 +132,17 @@ docker run --rm -p 8000:8000 bgpb-ml:latest
 
 ## Качество модели
 
-После `python train.py` смотрите `artifacts/metrics.json`. На дисбалансе
-классов (~11:1 good/bad) accuracy плохо интерпретируется, поэтому в поиске
-гиперпараметров и в отчёте используется ROC-AUC, плюс average precision.
+Актуальные цифры после `python train.py` лежат в `artifacts/metrics.json`
+и `artifacts/holdout_metrics.json`. На текущем прогоне:
+
+| выборка | ROC-AUC | average precision | accuracy | n |
+|---|---:|---:|---:|---:|
+| holdout 20% от `data.csv` | 0.81 | 0.97 | 0.80 | 513 |
+| `data_test_1.csv` | 0.96 | 0.99 | 0.88 | 26 |
+| `data_test_2.csv` | 0.91 | 0.99 | 0.84 | 129 |
+
+Классы несбалансированы (~11:1 good/bad), поэтому accuracy не является
+целевой метрикой: GridSearchCV оптимизирует ROC-AUC.
 
 Ноутбук `ml.ipynb` — исследование; воспроизводимый пайплайн для сдачи — `train.py`.
 
@@ -143,3 +151,6 @@ docker run --rm -p 8000:8000 bgpb-ml:latest
 - Целевой класс в данных: `1 = good`. Вероятность дефолта — дополнительное поле ответа.
 - Holdout `data_test_*` не участвует в подборе гиперпараметров.
 - Docker-образ API не содержит обучающий `data.csv`.
+- На macOS для локального XGBoost нужен OpenMP: `brew install libomp`.
+  Альтернатива — прогон тестов и обучения в Linux-контейнере:
+  `docker build -f Dockerfile.train -t bgpb-ml-train . && docker run --rm bgpb-ml-train`.

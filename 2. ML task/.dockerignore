@@ -6,9 +6,5 @@ __pycache__/
 .ipynb_checkpoints/
 .git/
 ml.ipynb
-tests/
-artifacts/data.csv
-artifacts/data_test_*.csv
-artifacts/y_test_*.csv
 *.png
 .DS_Store

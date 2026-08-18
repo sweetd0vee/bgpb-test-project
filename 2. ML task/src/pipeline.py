@@ -9,7 +9,6 @@ from sklearn.compose import ColumnTransformer
 from sklearn.impute import SimpleImputer
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import OrdinalEncoder
-from xgboost import XGBClassifier
 
 from src.features import CATEGORICAL, NUMERICAL
 
@@ -43,6 +42,8 @@ def build_pipeline(
     random_state: int = SEED,
     n_jobs: int = -1,
 ) -> Pipeline:
+    from xgboost import XGBClassifier
+
     categorical_transformer = Pipeline(
         steps=[
             ("imputer", SimpleImputer(strategy="constant", fill_value="missing")),

@@ -1,0 +1,21 @@
+{
+  "model_path": "artifacts/model.joblib",
+  "holdout": [
+    {
+      "features": "data_test_1.csv",
+      "labels": "y_test_1.csv",
+      "n_rows": 26,
+      "roc_auc": 0.9619047619047618,
+      "average_precision": 0.9912106871734203,
+      "accuracy": 0.8846153846153846
+    },
+    {
+      "features": "data_test_2.csv",
+      "labels": "y_test_2.csv",
+      "n_rows": 129,
+      "roc_auc": 0.9071618037135278,
+      "average_precision": 0.9894390114417011,
+      "accuracy": 0.8372093023255814
+    }
+  ]
+}

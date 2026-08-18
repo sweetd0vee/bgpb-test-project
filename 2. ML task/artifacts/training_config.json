@@ -1,0 +1,26 @@
+{
+  "data_path": "/app/artifacts/data.csv",
+  "seed": 42,
+  "test_size": 0.2,
+  "cv": 3,
+  "quick": false,
+  "param_grid": {
+    "model__n_estimators": [
+      50,
+      100
+    ],
+    "model__learning_rate": [
+      0.05,
+      0.1
+    ],
+    "model__max_depth": [
+      3,
+      5
+    ],
+    "model__min_child_weight": [
+      1,
+      3
+    ]
+  },
+  "target": "Marker (good=1, bad=0). probability_default = 1 - P(good)"
+}
